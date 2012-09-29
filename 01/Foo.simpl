@@ -1,0 +1,16 @@
+
+==================== Tidy Core ====================
+Result size = 12
+
+Foo.f :: GHC.Types.Int -> GHC.Types.Int -> GHC.Types.Int
+[GblId, Arity=2]
+Foo.f =
+  \ (x_a9H :: GHC.Types.Int) (y_a9I :: GHC.Types.Int) ->
+    GHC.Num.*
+      @ GHC.Types.Int
+      GHC.Num.$fNumInt
+      x_a9H
+      (GHC.Num.+ @ GHC.Types.Int GHC.Num.$fNumInt x_a9H y_a9I)
+
+
+
