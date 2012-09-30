@@ -21,7 +21,7 @@
 	ghc -c -Wall $<
 
 images = \
-	hscpipe2.png hscpipe2.bb
+	HscPipe2.png HscPipe2.bb
 
 
 

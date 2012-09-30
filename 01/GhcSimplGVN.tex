@@ -7,7 +7,7 @@
 \usefonttheme{professionalfonts}
 \usepackage{packages}
 
-\title{GHC を改造してプログラム変換}
+\title{GHC へのプログラム変換パスの追加}
 \author{日比野 啓}
 \date{ \today }
 
@@ -33,14 +33,14 @@
 \begin{frame}[fragile]
 \frametitle{今日の話}
 
-\includegraphics[height=8cm]{./hscpipe2.png}
+\includegraphics[height=8cm]{./HscPipe2.png}
 
 \end{frame}
 
 \begin{frame}[fragile]
 \frametitle{今日の話}
 
-\includegraphics[height=16cm]{./hscpipe2.png}
+\includegraphics[height=16cm]{./HscPipe2.png}
 
 \end{frame}
 
@@ -93,7 +93,7 @@ Core は GHC が内部で利用している Lambda式
 \begin{frame}[fragile]
 \frametitle{CoreからCoreへ}
 
-\includegraphics[height=16cm]{./hscpipe2.png}
+\includegraphics[height=16cm]{./HscPipe2.png}
 
 \end{frame}
 
@@ -118,7 +118,7 @@ Lambda式を変換すれば、GHCでプログラム変換が書ける。主に�
 \begin{frame}[fragile]
 \frametitle{simpl の変換パスの追加}
 
-仮に foo というパスを追加する
+例えば foo というパスを追加する
 
 \hrulefill
 
@@ -350,19 +350,23 @@ Foo (fooProgram) でプログラムが変換されるようになっているは
 \end{itemize}
 \end{frame}
 
-\begin{frame}[fragile]
-\frametitle{}
-\end{frame}
-
-\begin{frame}[fragile]
-\frametitle{}
-\end{frame}
-
-
 %% CSE (Common SubExpression Elimination)
 
 %%  PRE (Partial redundancy elimination) とも
 %%  式の字面で判断して共通式を除去
+
+\begin{frame}[fragile]
+\frametitle{実装されている最適化パスの例}
+
+CSE (Common SubExpression Elimination)
+
+\begin{itemize}
+\item -O1 -fcse
+\item PRE (Partial redundancy elimination) とも
+\item 式の字面で判断して共通式を除去
+\end{itemize}
+
+
 %%  x = p + q
 %%  y = p + q
 %%    ↓
@@ -372,39 +376,126 @@ Foo (fooProgram) でプログラムが変換されるようになっているは
 %%  x = p + q   -- Map  p + q => x
 %%  y = x
 
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{CSE}
+
+\begin{lstlisting}
+  x = p + q
+  y = p + q
+  -- ↓
+  x = p + q   -- Map  p + q => x
+  y = p + q   -- 置き換え対象
+  -- ↓
+  x = p + q   -- Map  p + q => x
+  y = x
+\end{lstlisting}
+
+\end{frame}
+
+
 %%  r = p
 %%  s = q
 %%  x = p + q
 %%  y = r + s
-%%    ↓
+%%  -- ↓
 %%  r = p
 %%  s = q
 %%  x = p + q   -- Map  p + q => x
 %%  y = r + s   -- Map  r + s => y
 %%              -- 置き換え対象が無い
 
+\begin{frame}[fragile]
+\frametitle{CSE}
+
+\begin{lstlisting}
+  r = p
+  s = q
+  x = p + q
+  y = r + s
+  -- ↓
+  r = p
+  s = q
+  x = p + q   -- Map  p + q => x
+  y = r + s   -- Map  r + s => y
+              -- 置き換え対象が無い
+\end{lstlisting}
+
+\end{frame}
+
 
 %%   用語 SSA (Static single assignment)
 
+
 %% GVN (Global value numbering)
 %%   式が生成する値ごとに異なる番号を付けていき、同じ番号の付いた式を除去する
+
+\begin{frame}[fragile]
+\frametitle{自分でも最適化パスを追加してみました}
+
+GVN (Global value numbering)
+
+\begin{itemize}
+\item 式が生成する値ごとに異なる番号を付けていき、同じ番号の付いた式を除去する
+\end{itemize}
+
+\end{frame}
+
+%%  -- p, q は自由変数
 %%  r = p
 %%  s = q
 %%  x = p + q
 %%  y = r + s
 %%  z = x * y
 %%
+
+
+\begin{frame}[fragile]
+\frametitle{GVN}
+
+\begin{lstlisting}
+  -- p, q は自由変数
+  r = p
+  s = q
+  x = p + q
+  y = r + s
+  z = x * y
+\end{lstlisting}
+
+\end{frame}
+
+%%  z = x * y -- 略
 %%            -- hash [r + s] = hplus [hash[r], hash[+], hash[s]]
 %%                            = hplus [      1,       2,       3] -- p => 1, (+) => 2, q => 3,
 %%                                                                -- r => 1, s => 3
 %%                            = 123 -- この例では例えば 123 になったとしておく
-%%
-%%  z = x * y -- 略
 %%  y = r + s -- y => 123
 %%  x = p + q -- x => 123
 %%  s = q     -- s => 2, q => 2
 %%  r = p     -- r => 1, r => 1
-%%
+
+\begin{frame}[fragile]
+\frametitle{GVN}
+
+\begin{lstlisting}
+  z = x * y -- 略
+  -- hash[r + s] = hplus[hash[r],
+  --                     hash[+],
+  --                     hash[s]]
+  --             -- p => 1, (+) => 2, q => 3,
+  --             -- r => 1, s => 3
+  --             = hplus[ 1, 2, 3]
+  --             = 123
+  --  この例では例えば 123 になったとしておく
+  y = r + s -- y => 123
+  x = p + q -- x => 123
+  s = q     -- s => 2, q => 2
+  r = p     -- r => 1, r => 1
+\end{lstlisting}
+
+\end{frame}
+
 %%  1:   r ==> p
 %%  2:   s ==> q
 %%  123: y ==> x
@@ -415,27 +506,58 @@ Foo (fooProgram) でプログラムが変換されるようになっているは
 %%  y = p + q -- 除去可能
 %%  z = x * x
 
+\begin{frame}[fragile]
+\frametitle{GVN}
 
-%% \begin{frame}[fragile]
-%% \frametitle{}
+\begin{lstlisting}
+  y = r + s -- y => 123
+  x = p + q -- x => 123
+  s = q     -- s => 2, q => 2
+  r = p     -- r => 1, r => 1
 
-%% \end{frame}
+  -- 1:   r ==> p
+  -- 2:   s ==> q
+  -- 123: y ==> x
+\end{lstlisting}
 
-%% \begin{frame}[fragile]
-%% \frametitle{}
+\end{frame}
 
-%% \end{frame}
+\begin{frame}[fragile]
+\frametitle{GVN}
 
-%% \begin{frame}[fragile]
-%% \frametitle{}
+\begin{lstlisting}
+  -- 1:   r ==> p
+  -- 2:   s ==> q
+  -- 123: y ==> x
 
-%% \end{frame}
+  r = p     -- 変化なし      -- 除去可能
+  s = q     -- 変化なし      -- 除去可能
+  x = p + q -- 変化なし
+  y = p + q -- <-- y = r + s -- 除去可能
+  z = x * x -- <-- z = x * y
+\end{lstlisting}
 
-%% \begin{frame}[fragile]
-%% \frametitle{}
+\end{frame}
 
-%% \end{frame}
 
+\begin{frame}[fragile]
+\frametitle{デモ}
+
+{ \Huge デモ }
+
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{まとめ}
+
+\begin{itemize}
+\item Lambda式 Core の変換でプログラム変換を実装できる
+\item ライブラリも結構使えるので書きやすい
+\item GVN を実装してみた。が不完全なのでもうちょっとがんばりたい
+\item Compiler plugin化もしてみたい
+\end{itemize}
+
+\end{frame}
 
 \end{document}
 
